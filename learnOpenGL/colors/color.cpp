@@ -6,6 +6,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "shader_m.h"
 #include "stb_image.h"
+#include "camera.h"
 #include <iostream>
 using namespace std;
 // Function Definitions
@@ -22,20 +23,14 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 const int SCREEN_WIDTH = 800;
 const int SCREEN_HEIGHT = 600;
 // Define inital camera system 
-glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f); 
-glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f); 
+Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 // Define deltaTime tracker 
 float deltaTime = 0.0f; 
 float lastFrame = 0.0f; 
 // Define initial XY targets 
-float lastX = 400, lastY = 300; 
-// Define yaw and pitch 
-float yaw = -90.0, pitch = 0; 
+float lastX = SCREEN_WIDTH / 2.0f, lastY = SCREEN_HEIGHT / 2.0f; 
 // Check for initial mouse movement 
 bool firstMouse = true;
-// Field of View 
-float fov = 45.0;  
 // Define lighting position 
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f); 
 
@@ -71,6 +66,7 @@ int main()
     cout << "Faield to initialize GLAD" << endl;
     return -1;
   }
+
   // Enable Depth Testing 
   glEnable(GL_DEPTH_TEST); 
 
@@ -82,49 +78,49 @@ int main()
   
   // Define vertices 
   float vertices[] = {
-    -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-     0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
-     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-    -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+        -0.5f, -0.5f, -0.5f, 
+         0.5f, -0.5f, -0.5f,  
+         0.5f,  0.5f, -0.5f,  
+         0.5f,  0.5f, -0.5f,  
+        -0.5f,  0.5f, -0.5f, 
+        -0.5f, -0.5f, -0.5f, 
 
-    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-     0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-     0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-     0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-    -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
-    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+        -0.5f, -0.5f,  0.5f, 
+         0.5f, -0.5f,  0.5f,  
+         0.5f,  0.5f,  0.5f,  
+         0.5f,  0.5f,  0.5f,  
+        -0.5f,  0.5f,  0.5f, 
+        -0.5f, -0.5f,  0.5f, 
 
-    -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-    -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-    -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+        -0.5f,  0.5f,  0.5f, 
+        -0.5f,  0.5f, -0.5f, 
+        -0.5f, -0.5f, -0.5f, 
+        -0.5f, -0.5f, -0.5f, 
+        -0.5f, -0.5f,  0.5f, 
+        -0.5f,  0.5f,  0.5f, 
 
-     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-     0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-     0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-     0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+         0.5f,  0.5f,  0.5f,  
+         0.5f,  0.5f, -0.5f,  
+         0.5f, -0.5f, -0.5f,  
+         0.5f, -0.5f, -0.5f,  
+         0.5f, -0.5f,  0.5f,  
+         0.5f,  0.5f,  0.5f,  
 
-    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-     0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
-     0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-     0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+        -0.5f, -0.5f, -0.5f, 
+         0.5f, -0.5f, -0.5f,  
+         0.5f, -0.5f,  0.5f,  
+         0.5f, -0.5f,  0.5f,  
+        -0.5f, -0.5f,  0.5f, 
+        -0.5f, -0.5f, -0.5f, 
 
-    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-    -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
-    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
-  };
-  
+        -0.5f,  0.5f, -0.5f, 
+         0.5f,  0.5f, -0.5f,  
+         0.5f,  0.5f,  0.5f,  
+         0.5f,  0.5f,  0.5f,  
+        -0.5f,  0.5f,  0.5f, 
+        -0.5f,  0.5f, -0.5f, 
+    };
+
   // Configure Cube VAO and VBO 
   // Declare VBO and cubeVAO 
   GLuint VBO, cubeVAO; 
@@ -139,20 +135,20 @@ int main()
   glBindVertexArray(cubeVAO); 
   // Set vertex attribute pointers
   // Positional attribute
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
   glEnableVertexAttribArray(0);
   
   // Configure Lamp VAO 
-  GLuint lampVAO;
+  GLuint lightVAO;
   // Generate lampVAO 
-  glGenVertexArrays(1, &lampVAO); 
+  glGenVertexArrays(1, &lightVAO); 
   // Bind lampVAO
-  glBindVertexArray(lampVAO); 
+  glBindVertexArray(lightVAO); 
   // Bind VBO 
   glBindBuffer(GL_ARRAY_BUFFER, VBO); 
   // Set vertex attribute pointers
   // Positional attribute
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
   glEnableVertexAttribArray(0);
 
   // Render loop
@@ -174,48 +170,41 @@ int main()
     lightingShader.use();
     // Set uniforms 
     // Set object color 
-    int objectColorLoc = glGetUniformLocation(lightingShader.ID, "objectColor"); 
-    glUniform3fv(objectColorLoc, 1, glm::value_ptr(glm::vec3(1.0f, 0.5f, 0.31f))); 
-    // Set lighting color 
-    int lightColorLoc = glGetUniformLocation(lightingShader.ID, "lightColor");
-    glUniform3fv(lightColorLoc, 1, glm::value_ptr(glm::vec3(1.0f, 1.0f, 1.0f))); 
+    lightingShader.setVec3("objectColor", 1.0f, 0.5f, 0.3f); 
+    lightingShader.setVec3("lightColor", 1.0f, 1.0f, 1.0f); 
+
     // Define view, projection, object matrices  
     // Define view matrix
     glm::mat4 view;
     // Set lookAt 
-    view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp); 
+    view = camera.GetViewMatrix();
     // Define projection matrix
     glm::mat4 projection; 
-    projection = glm::perspective(glm::radians(fov), (float) SCREEN_WIDTH / SCREEN_HEIGHT, 0.1f, 100.0f);
+    projection = glm::perspective(glm::radians(camera.Zoom), (float) SCREEN_WIDTH / SCREEN_HEIGHT, 0.1f, 100.0f);
     // Define model matrix 
     glm::mat4 model;
     // Feed into uniforms 
-    int viewLoc = glGetUniformLocation(lightingShader.ID, "view"); 
-    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-    int projectionLoc = glGetUniformLocation(lightingShader.ID, "projection"); 
-    glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection)); 
-    int modelLoc = glGetUniformLocation(lightingShader.ID, "model"); 
-    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(projection)); 
+    lightingShader.setMat4("projection", projection);
+    lightingShader.setMat4("view", view);
+    lightingShader.setMat4("model", model); 
+
     //  Render the cube 
     glBindVertexArray(cubeVAO);
     glDrawArrays(GL_TRIANGLES, 0, 36); 
     
     // Use lamp shader program 
     lampShader.use();
-    // Set view uniform
-    viewLoc = glGetUniformLocation(lampShader.ID, "view"); 
-    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-    // Set projection uniform
-    projectionLoc = glGetUniformLocation(lampShader.ID, "projection"); 
-    glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
     // Define new model  position 
-    model = glm::mat4();
+    model = glm::mat4(1.0f);
     model = glm::translate(model, lightPos); 
     model = glm::scale(model, glm::vec3(0.2f)); 
-    modelLoc = glGetUniformLocation(lampShader.ID, "model"); 
-    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));     
+    // Feed into uniforms 
+    lampShader.setMat4("projection", projection);
+    lampShader.setMat4("view", view);
+    lampShader.setMat4("model", model);
+ 
     //  Render the cube 
-    glBindVertexArray(lampVAO);
+    glBindVertexArray(lightVAO);
     glDrawArrays(GL_TRIANGLES, 0, 36); 
 
     // Swap color buffers
@@ -225,7 +214,7 @@ int main()
   }
   // De-allocate resources
   glDeleteVertexArrays(1, &cubeVAO);
-  glDeleteVertexArrays(1, &lampVAO); 
+  glDeleteVertexArrays(1, &lightVAO); 
   glDeleteBuffers(1, &VBO);
 
   // Terminate after exiting loop
@@ -249,14 +238,13 @@ void processInput(GLFWwindow *window)
 	// Configuration for movement 
 	float cameraSpeed = 2.5f * deltaTime; 
 	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) 
-		cameraPos += cameraSpeed * cameraFront; 
+		camera.ProcessKeyboard(FORWARD, deltaTime);
 	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-		cameraPos -= cameraSpeed * cameraFront; 
+		camera.ProcessKeyboard(BACKWARD, deltaTime);
 	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-		cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed; 
+		camera.ProcessKeyboard(LEFT, deltaTime);
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-		cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed; 
-
+		camera.ProcessKeyboard(RIGHT, deltaTime); 
 }
 
 // Mouse input handling 
@@ -272,34 +260,10 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 	float yoffset = lastY - ypos; 
 	lastX = xpos;
 	lastY = ypos; 
-	// Calibrate for desired sensitivity 
-	float sensitivity = 0.05f; 
-	xoffset *= sensitivity; 
-	yoffset *= sensitivity; 
-	// Calculate yaw and pitch values 
-	yaw += xoffset; 
-	pitch += yoffset; 
-	// Add constraints to the max/min pitch values 
-	if(pitch > 89.0f) 
-		pitch = 89.0f;
-	if(pitch < -89.0f) 
-		pitch = 89.0f;
-
-	
-    	// Define front 
-    	glm::vec3 front;
-    	front.x = cos(glm::radians(pitch)) * cos(glm::radians(yaw));
-    	front.y = sin(glm::radians(pitch));
-    	front.z = cos(glm::radians(pitch)) * sin(glm::radians(yaw));
-    	cameraFront = glm::normalize(front);
+	// Process mouse movement
+	camera.ProcessMouseMovement(xoffset, yoffset);
 } 
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
-	// If in range 
-	if(fov >= 1.0f && fov <= 45.0f) 
-		fov -= yoffset; 
-	if(fov <= 1.0f) 
-		fov = 1.0f;
-	if(fov >= 45.0)
-		fov = 45.0f;
+	camera.ProcessMouseScroll(yoffset);
 } 
