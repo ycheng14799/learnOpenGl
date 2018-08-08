@@ -19,6 +19,7 @@ struct Vertex {
 struct Texture {
 	unsigned int id;
 	string type;
+	string path; // store path of texture to compare with other textures
 };
 class Mesh {
 	public: 
