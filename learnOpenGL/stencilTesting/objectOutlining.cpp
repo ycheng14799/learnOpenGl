@@ -68,9 +68,17 @@ int main() {
 
 	// Configure global openGL state
 	glEnable(GL_DEPTH_TEST);
-
+	glDepthFunc(GL_LESS);
+	glEnable(GL_STENCIL_TEST);
+	glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+	glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE); 
+	// Settings of stencil test:
+	// If any of tests fail, do nothing 
+	// If both stencil and depth test succeed, replace stored stencil value with reference value
+	
 	// Build and compile shader program
 	Shader shader("basicScene.vs", "basicScene.fs");
+	Shader singleColorShader("basicScene.vs", "singleShaderColor.fs");
 
 	// set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
@@ -226,33 +234,75 @@ int main() {
 
 		// render
 		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    shader.use();
-    glm::mat4 model;
-    glm::mat4 view = camera.GetViewMatrix();
-    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-    shader.setMat4("view", view);
-    shader.setMat4("projection", projection);
-
-		// cubes
-		glBindVertexArray(cubeVAO);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, cubeTexture);
-    model = glm::translate(model, glm::vec3(-1.0f, 0.0f, -1.0f));
-    shader.setMat4("model", model);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-    model = glm::mat4();
-    model = glm::translate(model, glm::vec3(2.0f, 0.0f, 0.0f));
-    shader.setMat4("model", model);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
+    		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+		
+		// Set uniforms
+    		shader.use();
+   		glm::mat4 model;
+    		glm::mat4 view = camera.GetViewMatrix();
+    		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    		shader.setMat4("view", view);
+    		shader.setMat4("projection", projection);
+		
+		singleColorShader.use();
+		singleColorShader.setMat4("view", view);
+		singleColorShader.setMat4("projection", projection);
+		
 		// floor
+		// Do not update stencil buffer while drawng floor
+		glStencilMask(0x00);
+		shader.use();
 		glBindVertexArray(planeVAO);
     glBindTexture(GL_TEXTURE_2D, planeTexture);
     shader.setMat4("model", glm::mat4());
     glDrawArrays(GL_TRIANGLES, 0, 6);
   	glBindVertexArray(0);
 
+		// cubes
+		// Clear stencil buffer to 0s 
+		// Update stencil buffer to 1 for each fragment drawn 
+		glStencilFunc(GL_ALWAYS, 1, 0xFF); // all fragments should update the stencil buffer
+		glStencilMask(0xFF); // Enable writing to stencil buffer 
+		// Draw cubes
+		glBindVertexArray(cubeVAO);
+   		glActiveTexture(GL_TEXTURE0);
+    		glBindTexture(GL_TEXTURE_2D, cubeTexture);
+    		model = glm::translate(model, glm::vec3(-1.0f, 0.0f, -1.0f));
+    		shader.setMat4("model", model);
+    		glDrawArrays(GL_TRIANGLES, 0, 36);
+    		model = glm::mat4();
+    		model = glm::translate(model, glm::vec3(2.0f, 0.0f, 0.0f));
+    		shader.setMat4("model", model);
+    		glDrawArrays(GL_TRIANGLES, 0, 36);
+		
+		// Now with stencil buffer updated to 1s where containers were drawn
+		// Draw upscaled containers, disabling writes to stencil buffer
+		glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+		// disable writing to stencil buffer
+		glStencilMask(0x00);
+		// Disable depth test
+		glDisable(GL_DEPTH_TEST);
+		// Use single color shader
+		singleColorShader.use();
+		// Draw scaled up containers 
+		float scale = 1.1; 
+		glBindVertexArray(cubeVAO);
+   		glActiveTexture(GL_TEXTURE0);
+    		glBindTexture(GL_TEXTURE_2D, cubeTexture);
+		model = glm::mat4();
+    		model = glm::translate(model, glm::vec3(-1.0f, 0.0f, -1.0f));
+		model = glm::scale(model, glm::vec3(scale, scale, scale));
+    		singleColorShader.setMat4("model", model);
+    		glDrawArrays(GL_TRIANGLES, 0, 36);
+    		model = glm::mat4();
+    		model = glm::translate(model, glm::vec3(2.0f, 0.0f, 0.0f));
+		model = glm::scale(model, glm::vec3(scale, scale, scale));	
+    		singleColorShader.setMat4("model", model);
+    		glDrawArrays(GL_TRIANGLES, 0, 36);
+		glBindVertexArray(0); 		
+		// Reneable depth buffer and reset stencil mask 
+		glStencilMask(0xFF);
+		glEnable(GL_DEPTH_TEST);
 
 		// glfw: Swap buffers and poll IO events
 		glfwSwapBuffers(window);
