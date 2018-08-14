@@ -79,7 +79,7 @@ int main()
 
     // build and compile shaders
     // -------------------------
-    Shader shader("reflection.vs", "refraction.fs");
+    Shader shader("reflection.vs", "reflection.fs");
     Shader skyboxShader("skybox.vs", "skybox.fs");
 
     // set up vertex data (and buffer(s)) and configure vertex attributes
