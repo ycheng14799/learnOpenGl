@@ -7,6 +7,7 @@
 
 #include "camera.h"
 #include "shader_m.h"
+#include "model.h"
 
 #include <iostream>
 #include <stdio.h>
@@ -20,11 +21,11 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 
 // settings
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
+const unsigned int SCR_WIDTH = 1280;
+const unsigned int SCR_HEIGHT = 720;
 
 // camera
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+Camera camera(glm::vec3(0.0f, 0.0f, 55.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -68,61 +69,79 @@ int main()
         	cout << "Failed to initialize GLAD" << endl;
         	return -1;
     	}
+
+	// Configure global opengl state
+ 	glEnable(GL_DEPTH_TEST);
 	
 	// Shaders 
-	Shader shader("instancing.vs", "instancing.fs");
-	
-	// Generate offset positions 
-	glm::vec2 translations[100];
-	int index = 0;
-	float offset = 0.1f;
-	for (int y = -10; y < 10; y += 2) 
-	{
-		for (int x = -10; x < 10; x += 2)
-		{
-			glm::vec2 translation;
-			translation.x = (float) x / 10.0f + offset;
-			translation.y = (float) y / 10.0f + offset;
-			translations[index++] = translation;
-		}
-	}
-	// Generate instance VBO
-	unsigned int instanceVBO;
-	glGenBuffers(1, &instanceVBO);
-	glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2) * 100, & translations[0], GL_STATIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);	
-	
-	// Define rectangle vertices 
-	float quadVertices[] = {
-   		 // positions     // colors
-   		-0.05f,  0.05f,  1.0f, 0.0f, 0.0f,
-    		0.05f, -0.05f,  0.0f, 1.0f, 0.0f,
-    		-0.05f, -0.05f,  0.0f, 0.0f, 1.0f,
+	Shader instanceShader("asteroidFieldInstance.vs", "asteroidField.fs");
+	Shader shader("asteroidField.vs", "asteroidField.fs");
 
-    		-0.05f,  0.05f,  1.0f, 0.0f, 0.0f,
-     		0.05f, -0.05f,  0.0f, 1.0f, 0.0f,   
-     		0.05f,  0.05f,  0.0f, 1.0f, 1.0f		    		
-	};  
+	// Load models 
+	Model rockModel("rock/rock.obj");
+	Model planetModel("planet/planet.obj");
 	
-	// Generate VBO and VAO: Positional and color  
-	unsigned int quadVBO;
-	unsigned int quadVAO;
-	glGenBuffers(1, &quadVBO);
-	glGenVertexArrays(1, &quadVAO);
-	glBindVertexArray(quadVAO);
-	glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(2 * sizeof(float)));
- 	// Set up vertex attribute pointer and enable vertex attribute 
-	glEnableVertexAttribArray(2);
-	glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glVertexAttribDivisor(2, 1);
+	// Generate positions 
+	unsigned int amount = 2000;
+	glm::mat4 *modelMatrices;
+	modelMatrices = new glm::mat4[amount];
+	// Initialize random seed 
+	srand(glfwGetTime());
+	float radius = 50.0;
+	float offset = 5.0f;
+	for (unsigned int i = 0; i < amount; i++) 
+	{
+		glm::mat4 model;
+		// translation: displace along circle with radius in range [-offset, offset]
+		float angle = (float) i / (float) amount * 360.0f;
+		float displacement = (rand() % (int)(2 * offset * 100)) / 100.0f - offset;
+		float x = sin(angle) * radius + displacement;
+		displacement = (rand() % (int)(2 * offset * 100)) / 100.0f - offset;
+		float y = displacement * 0.4f; // Keep height of field smaller compared to width of x and z 
+		displacement = (rand() % (int)(2 * offset * 100)) / 100.0f - offset; 
+		float z = cos(angle) * radius + displacement; 
+		model = glm::translate(model, glm::vec3(x, y, z));
+		
+		// scale 
+		float scale = (rand() % 20) / 100.0 + 0.05;
+		model = glm::scale(model, glm::vec3(scale));
+
+		// rotation: add random rotation around semi-randomly picked rotation axis
+		float rotAngle = (rand() % 360);
+		model = glm::scale(model, glm::vec3(scale));
+
+		// Add to list of matrices 
+		modelMatrices[i] = model;
+	}
+	
+	// vertex buffer object 
+	unsigned int buffer;
+	glGenBuffers(1, &buffer);
+	glBindBuffer(GL_ARRAY_BUFFER, buffer);
+	glBufferData(GL_ARRAY_BUFFER, amount * sizeof(glm::mat4), &modelMatrices[0], GL_STATIC_DRAW);
+	
+	for(unsigned int i = 0; i < rockModel.meshes.size(); i++)
+	{
+    		unsigned int VAO = rockModel.meshes[i].VAO;
+   		glBindVertexArray(VAO);
+    		// vertex Attributes
+    		GLsizei vec4Size = sizeof(glm::vec4);
+    		glEnableVertexAttribArray(3); 
+    		glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 4 * vec4Size, (void*)0);
+    		glEnableVertexAttribArray(4); 
+    		glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, 4 * vec4Size, (void*)(vec4Size));
+    		glEnableVertexAttribArray(5); 
+    		glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, 4 * vec4Size, (void*)(2 * vec4Size));
+    		glEnableVertexAttribArray(6); 
+    		glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, 4 * vec4Size, (void*)(3 * vec4Size));
+
+    		glVertexAttribDivisor(3, 1);
+    		glVertexAttribDivisor(4, 1);
+    		glVertexAttribDivisor(5, 1);
+    		glVertexAttribDivisor(6, 1);
+
+   		glBindVertexArray(0);
+	} 
  
 	// Render loop
 	while (!glfwWindowShouldClose(window))
@@ -141,12 +160,35 @@ int main()
         	// ------
         	glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
         	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-		// Draw rectangles	
+		
+		// configure transformation matrices 
+		glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 1000.0f);
+		glm::mat4 view = camera.GetViewMatrix();
 		shader.use();
-		glBindVertexArray(quadVAO);
-		glDrawArraysInstanced(GL_TRIANGLES, 0, 6, 100);
-		glBindVertexArray(0);
+		shader.setMat4("projection", projection);
+		shader.setMat4("view", view);
+		instanceShader.use();
+		instanceShader.setMat4("projection", projection);
+		instanceShader.setMat4("view", view);
+
+		// Draw planet 
+		shader.use();
+		glm::mat4 model;
+		model = glm::translate(model, glm::vec3(0.0f, -3.0f, 0.0f));
+		model = glm::scale(model, glm::vec3(4.0f, 4.0f, 4.0f));
+		shader.setMat4("model", model);
+		planetModel.Draw(shader);
+		
+		
+		// draw meteorites
+		instanceShader.use();
+		for(unsigned int i = 0; i < rockModel.meshes.size(); i++)
+		{
+    			glBindVertexArray(rockModel.meshes[i].VAO);
+    			glDrawElementsInstanced(
+        			GL_TRIANGLES, rockModel.meshes[i].indices.size(), GL_UNSIGNED_INT, 0, amount
+    			);
+		}  
 
 		// glfw: swap buffers and poll IO events
 		glfwSwapBuffers(window);
